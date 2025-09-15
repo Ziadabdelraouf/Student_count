@@ -74,7 +74,7 @@ for index, row in df.iterrows():
         filename = f"{row['Code']}_{row['Session Type']}-{schid}.xlsx"
         file_path = os.path.join(download_dir, filename)
             
-        print(f"Downloading {row['Code']}_{row['Session Type']}-{schid}.xlsx}...")
+        print(f"Downloading {filename}.xlsx")
             
         response = requests.get(url,headers=headers,timeout=30, stream=True)
         response.raise_for_status()
@@ -82,7 +82,7 @@ for index, row in df.iterrows():
         with open(file_path, 'wb') as f:
             f.write(response.content)
             
-        print(f"Successfully saved: {f"{row['Name']}_{row['Session Type']}-{schid}.xlsx"}")
+        print(f"Successfully saved: {filename}.xlsx")
             
     except Exception as e:
         print(f"Error downloading {url}: {e}")
