@@ -23,47 +23,26 @@ jobs:
       - name: Run Scraper Script
         run: python scraper.py
 
-      - name: Get file info
-        id: file_info
-        run: |
-          if [ -f "results.xlsx" ]; then
-            file_size=$(du -h results.xlsx | cut -f1)
-            echo "file_exists=true" >> $GITHUB_OUTPUT
-            echo "file_size=$file_size" >> $GITHUB_OUTPUT
-          else
-            echo "file_exists=false" >> $GITHUB_OUTPUT
-          fi
+      - name: Send notification message
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ⚡ *Scraper Started*
+            
+            Student scraper is running...
+            *Repository:* ${{ github.repository }}
+            *Time:* $(date +'%Y-%m-%d %H:%M')
 
-      - name: Send results to Telegram
-        if: steps.file_info.outputs.file_exists == 'true'
+      - name: Send results file
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           document: results.xlsx
           caption: |
-            📊 *Student Scraper Results*
+            ✅ *Scraper Completed*
             
-            *📅 Date:* $(date +'%Y-%m-%d %H:%M')
-            *📁 File:* results.xlsx
-            *💾 Size:* ${{ steps.file_info.outputs.file_size }}
-            *🔗 Run:* [${{ github.repository }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            
-            _File attached successfully!_
-
-      - name: Notify if no file
-        if: steps.file_info.outputs.file_exists == 'false'
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          message: |
-            ❌ *Scraper Failed*
-            
-            No results file was generated!
-            
-            *Repository:* ${{ github.repository }}
-            *Run ID:* ${{ github.run_id }}
-            *Time:* $(date +'%Y-%m-%d %H:%M')
-            
-            Please check the workflow logs.
+            📊 Results file attached!
+            📅 $(date +'%Y-%m-%d %H:%M')
