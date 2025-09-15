@@ -1,18 +1,16 @@
 name: Run Student Scraper
 
 on:
-  workflow_dispatch: # Allows you to run it manually from the GitHub UI
+  workflow_dispatch:
   schedule:
-    - cron: '0 5 * * *'  # Runs every day at 8:00 PM UTC. Adjust to your preferred time.
+    - cron: '0 5 * * *'
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code (and previous data)
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -25,10 +23,47 @@ jobs:
       - name: Run Scraper Script
         run: python scraper.py
 
-      - name: Commit and Push Results
+      - name: Get file info
+        id: file_info
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add .
-          git commit -m "Automated update: Scraped data and results [$(date)]" || echo "No changes to commit"
-          git push
+          if [ -f "results.xlsx" ]; then
+            file_size=$(du -h results.xlsx | cut -f1)
+            echo "file_exists=true" >> $GITHUB_OUTPUT
+            echo "file_size=$file_size" >> $GITHUB_OUTPUT
+          else
+            echo "file_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send results to Telegram
+        if: steps.file_info.outputs.file_exists == 'true'
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          document: results.xlsx
+          caption: |
+            📊 *Student Scraper Results*
+            
+            *📅 Date:* $(date +'%Y-%m-%d %H:%M')
+            *📁 File:* results.xlsx
+            *💾 Size:* ${{ steps.file_info.outputs.file_size }}
+            *🔗 Run:* [${{ github.repository }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            _File attached successfully!_
+
+      - name: Notify if no file
+        if: steps.file_info.outputs.file_exists == 'false'
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ❌ *Scraper Failed*
+            
+            No results file was generated!
+            
+            *Repository:* ${{ github.repository }}
+            *Run ID:* ${{ github.run_id }}
+            *Time:* $(date +'%Y-%m-%d %H:%M')
+            
+            Please check the workflow logs.
