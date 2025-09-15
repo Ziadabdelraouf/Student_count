@@ -54,14 +54,14 @@ for row in column_data:
 
 
 
-# df.to_csv('output.csv')
+df.to_csv('output.csv')
 
  
 
 download_dir = "downloaded_files"
 os.makedirs(download_dir, exist_ok=True)
 
-df=pd.read_csv('output.csv')
+# df=pd.read_csv('output.csv')
 #  Download each file
 for index, row in df.iterrows():
     try:
@@ -74,7 +74,7 @@ for index, row in df.iterrows():
         filename = f"{row['Code']}_{row['Session Type']}-{schid}.xlsx"
         file_path = os.path.join(download_dir, filename)
             
-        print(f"Downloading {f"{row['Code']}_{row['Session Type']}-{schid}.xlsx"}...")
+        print(f'Downloading {f"{row['Code']}_{row['Session Type']}-{schid}.xlsx"}...')
             
         response = requests.get(url,headers=headers,timeout=30, stream=True)
         response.raise_for_status()
