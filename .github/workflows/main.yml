@@ -1,8 +1,9 @@
 name: Run Student Scraper
 
 on:
-  schedule:
-    - cron: '0 * * * *'
+  workflow_dispatch:  # Allows manual triggering
+  repository_dispatch: # Allows API triggering
+    types: [trigger-scraper]
 
 jobs:
   scrape:
