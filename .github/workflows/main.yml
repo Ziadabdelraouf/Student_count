@@ -48,7 +48,7 @@ jobs:
             Student scraper is running...
             *Repository:* ${{ github.repository }}
             *Parameter:* ${{ env.PARAMETER || 'None' }}
-            *Time:* $(date +'%Y-%m-%d %H:%M')
+            
 
       - name: Send results file
         uses: appleboy/telegram-action@master
@@ -60,4 +60,4 @@ jobs:
             ✅ *Scraper Completed*
             
             📊 Results file attached!
-            📅 $(date +'%Y-%m-%d %H:%M')
+           
