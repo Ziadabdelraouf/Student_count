@@ -5,6 +5,7 @@ import pandas as pd
 import os
 from collections import defaultdict
 import glob
+import sys
 from urllib.parse import urlparse, parse_qs
  
 headers = {
@@ -155,4 +156,9 @@ def process_excel_files(name):
         
     except Exception as e:
         print(f"Error writing to Excel file: {e}")
-process_excel_files('زياد عبدالرؤف حسن ابوالحديد')
+     
+if len(sys.argv) > 1:
+    namee = sys.argv[1]
+else:
+ namee="زياد عبدالرؤف حسن ابوالحديد"
+process_excel_files(namee)
