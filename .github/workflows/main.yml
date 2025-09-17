@@ -20,8 +20,22 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Scraper Script
-        run: python scraper.py
+      - name: Extract parameter (if provided)
+        id: extract-param
+        run: |
+          if [ -n "${{ github.event.client_payload.parameter }}" ]; then
+            echo "PARAMETER=${{ github.event.client_payload.parameter }}" >> $GITHUB_ENV
+          else
+            echo "PARAMETER=" >> $GITHUB_ENV
+          fi
+
+      - name: Run Scraper Script with parameter
+        run: |
+          if [ -n "$PARAMETER" ]; then
+            python scraper.py "$PARAMETER"
+          else
+            python scraper.py
+          fi
 
       - name: Send notification message
         uses: appleboy/telegram-action@master
@@ -33,6 +47,7 @@ jobs:
             
             Student scraper is running...
             *Repository:* ${{ github.repository }}
+            *Parameter:* ${{ env.PARAMETER || 'None' }}
             *Time:* $(date +'%Y-%m-%d %H:%M')
 
       - name: Send results file
