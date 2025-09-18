@@ -1,0 +1,85 @@
+name: Student Data Manager
+
+on:
+  workflow_dispatch:  # Allows manual triggering for searching
+  repository_dispatch: # Allows API triggering for searching
+    types: [trigger-scraper]
+  schedule:
+    - cron: '*/20 * * * *'  # Run download every 20 minutes
+
+jobs:
+  download:
+    # This job only runs on schedule to download files
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download latest files
+        run: python downloader.py
+
+      - name: Commit and push if files changed
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add downloaded_files/*
+          git commit -m "Update downloaded files [skip ci]" || echo "No changes to commit"
+          git push
+
+  search:
+    # This job only runs on manual or API triggers for searching
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Extract search parameter and chat ID
+        id: extract-params
+        run: |
+          if [ -n "${{ github.event.client_payload.parameter }}" ]; then
+            echo "SEARCH_PARAMETER=${{ github.event.client_payload.parameter }}" >> $GITHUB_ENV
+          else
+            echo "SEARCH_PARAMETER=زياد عبدالرؤف حسن ابوالحديد" >> $GITHUB_ENV
+          fi
+          
+          if [ -n "${{ github.event.client_payload.chat_id }}" ]; then
+            echo "CHAT_ID=${{ github.event.client_payload.chat_id }}" >> $GITHUB_ENV
+          else
+            echo "CHAT_ID=" >> $GITHUB_ENV
+          fi
+
+      - name: Run Search
+        run: python searcher.py "$SEARCH_PARAMETER"
+
+      - name: Send results via Telegram
+        run: |
+          if [ -n "$CHAT_ID" ]; then
+            echo "Sending results to chat ID: $CHAT_ID"
+            python send_telegram.py "$CHAT_ID" "$SEARCH_PARAMETER"
+          else
+            echo "No chat ID provided, skipping Telegram notification"
+          fi
+
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: search-results
+          path: results.xlsx
