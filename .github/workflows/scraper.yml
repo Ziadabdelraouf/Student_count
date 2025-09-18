@@ -29,13 +29,16 @@ jobs:
       - name: Download latest files
         run: python downloader.py
 
+    
       - name: Commit and push if files changed
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add downloaded_files/*
           git commit -m "Update downloaded files [skip ci]" || echo "No changes to commit"
-          git push
+          git fetch origin
+          git rebase origin/main
+          git push --force
 
   search:
     # This job only runs on manual or API triggers for searching
