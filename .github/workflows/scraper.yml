@@ -41,6 +41,8 @@ jobs:
     # This job only runs on manual or API triggers for searching
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -67,6 +69,10 @@ jobs:
           else
             echo "CHAT_ID=" >> $GITHUB_ENV
           fi
+          
+          # Debug: Print what we received
+          echo "Received chat_id: ${{ github.event.client_payload.chat_id }}"
+          echo "Received parameter: ${{ github.event.client_payload.parameter }}"
 
       - name: Run Search
         run: python searcher.py "$SEARCH_PARAMETER"
@@ -75,6 +81,7 @@ jobs:
         run: |
           if [ -n "$CHAT_ID" ]; then
             echo "Sending results to chat ID: $CHAT_ID"
+            echo "Telegram token available: $(if [ -n "$TELEGRAM_BOT_TOKEN" ]; then echo "YES"; else echo "NO"; fi)"
             python send_telegram.py "$CHAT_ID" "$SEARCH_PARAMETER"
           else
             echo "No chat ID provided, skipping Telegram notification"
