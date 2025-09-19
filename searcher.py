@@ -6,7 +6,7 @@ import sys
 import json
 from datetime import datetime
 
-def process_excel_files(name):
+def process_excel_files(Code):
     current_dir = os.path.dirname(os.path.abspath(__file__))
     download_dir = os.path.join(current_dir, "downloaded_files")
     
@@ -27,20 +27,23 @@ def process_excel_files(name):
         try:
             df = pd.read_excel(excel_file)
             
-            if 'Student Name' not in df.columns:
-                print(f"Warning: 'Student Name' column not found in {filename}")
+            if 'Student Name' not in df.columns or 'Code' not in df.columns:
+                print(f"Warning: Required columns not found in {filename}")
                 continue
-            
-            for student_name in df['Student Name'].dropna().astype(str).str.strip(): 
-                if name in student_name:
+
+            for student_code in df['Code'].dropna().astype(str).str.strip():
+                if Code in student_code:
                     count = True
                     break
-                
+
             if count is True:
-                for student_name in df['Student Name'].dropna().astype(str).str.strip():
-                    if student_name:  # Skip empty names
-                        student_data[student_name]['count'] += 1
-                        student_data[student_name]['files'].add(subj)
+                for student_code in df['Code'].dropna().astype(str).str.strip():
+                    if student_code:  # Skip empty codes
+                        student_data[student_code]['count'] += 1
+                        student_data[student_code]['files'].add(subj)
+                        # Safely get the student name
+                        name_row = df.loc[df['Code'].astype(str).str.strip() == student_code, 'Student Name']
+                        student_data[student_code]['Student Name'] = name_row.values[0] if not name_row.empty else ""
             count = False
             
         except Exception as e:
@@ -51,9 +54,10 @@ def process_excel_files(name):
         return {"error": "No matching students found"}
     
     output_data = []
-    for student_name, info in student_data.items():
+    for student_code, info in student_data.items():
         output_data.append({
-            'Student Name': student_name,
+            'Code': student_code,
+            'Student Name': info['Student Name'],
             'Frequency': info['count'],
             'File(s) of Appearance': ', '.join(sorted(info['files']))
         })
@@ -69,7 +73,7 @@ def process_excel_files(name):
         
         # Also create a JSON summary for easy webhook responses
         summary = {
-            "search_parameter": name,
+            "search_parameter": Code,
             "total_matches": len(results_df),
             "top_matches": results_df.head(5).to_dict('records'),
             "last_updated": datetime.now().isoformat()
@@ -86,11 +90,10 @@ def process_excel_files(name):
 
 def main():
     if len(sys.argv) > 1:
-        namee = sys.argv[1]
+        codee = sys.argv[1]
     else:
-        namee = "زياد عبدالرؤف حسن ابوالحديد"
-    
-    result = process_excel_files(namee)
+        codee = '1230040'
+    result = process_excel_files(codee)
     print(f"Search result: {result}")
 
 if __name__ == "__main__":
