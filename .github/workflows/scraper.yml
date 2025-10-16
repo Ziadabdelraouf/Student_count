@@ -4,8 +4,10 @@ on:
   workflow_dispatch:  # Allows manual triggering for searching
   repository_dispatch: # Allows API triggering for searching
     types: [trigger-scraper]
-  schedule:
-    - cron: '0 */12 * * *'  # Run every 12 hours at minute 0
+ 
+ ## paused until further notice
+ # schedule:
+   # - cron: '0 */12 * * *'  # Run every 12 hours at minute 0
 
 jobs:
   download:
