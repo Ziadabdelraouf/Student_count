@@ -1,18 +1,27 @@
 name: Student Data Manager
 
 on:
-  workflow_dispatch:  # Allows manual triggering for searching
+  workflow_dispatch:  # Updated to include a dropdown menu
+    inputs:
+      action_type:
+        description: 'Choose which job to run'
+        required: true
+        default: 'search'
+        type: choice
+        options:
+          - search
+          - download
+  
   repository_dispatch: # Allows API triggering for searching
     types: [trigger-scraper]
- 
- # paused until further notice
+  
   schedule:
-    - cron: '0 * * * *'  # Run every hour at minute 0
+    - cron: '0 * * * *'  # Runs every hour
 
 jobs:
   download:
-    # This job only runs on schedule to download files
-    if: github.event_name == 'schedule'
+    # Runs on Schedule OR when you manually select 'download'
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.action_type == 'download')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -31,7 +40,6 @@ jobs:
       - name: Download latest files
         run: python downloader.py
 
-    
       - name: Commit and push if files changed
         run: |
           git config --local user.email "action@github.com"
@@ -41,8 +49,9 @@ jobs:
           git push --force
 
   search:
-    # This job only runs on manual or API triggers for searching
-    if: github.event_name != 'schedule'
+    # Runs on API Trigger OR when you manually select 'search'
+    # (Prevents it from running when you just want to download files)
+    if: github.event_name == 'repository_dispatch' || (github.event_name == 'workflow_dispatch' && inputs.action_type == 'search')
     runs-on: ubuntu-latest
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -73,7 +82,6 @@ jobs:
             echo "CHAT_ID=" >> $GITHUB_ENV
           fi
           
-          # Debug: Print what we received
           echo "Received chat_id: ${{ github.event.client_payload.chat_id }}"
           echo "Received parameter: ${{ github.event.client_payload.parameter }}"
 
@@ -84,7 +92,6 @@ jobs:
         run: |
           if [ -n "$CHAT_ID" ]; then
             echo "Sending results to chat ID: $CHAT_ID"
-            echo "Telegram token available: $(if [ -n "$TELEGRAM_BOT_TOKEN" ]; then echo "YES"; else echo "NO"; fi)"
             python send_telegram.py "$CHAT_ID" "$SEARCH_PARAMETER"
           else
             echo "No chat ID provided, skipping Telegram notification"
