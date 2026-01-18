@@ -51,11 +51,6 @@ def download_files():
     for index, row in df.iterrows():
         try:
             url = row['Download']
-            
-            # Parse the URL and extract query parameters
-            parsed_url = urlparse(url)
-            query_params = parse_qs(parsed_url.query)
-            schid = query_params.get('schid', [''])[0]
             filename = f"{row['Code']}_{row['Session Type']}-{str(uuid.uuid4())[:8]}.xlsx"
             file_path = os.path.join(temp_dir, filename)
                 
