@@ -5,9 +5,9 @@ on:
   repository_dispatch: # Allows API triggering for searching
     types: [trigger-scraper]
  
- ## paused until further notice
- # schedule:
-   # - cron: '0 */12 * * *'  # Run every 12 hours at minute 0
+ # paused until further notice
+  schedule:
+    - cron: '0 * * * *'  # Run every hour at minute 0
 
 jobs:
   download:
