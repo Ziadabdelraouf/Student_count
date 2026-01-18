@@ -8,7 +8,7 @@ from datetime import datetime
 
 def process_excel_files(Code):
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    download_dir = os.path.join(current_dir, "downloaded_files")
+    download_dir = os.path.join(current_dir, "downloaded_files_parallel")
     
     excel_files = glob.glob(os.path.join(download_dir, "*.xlsx"))
     
