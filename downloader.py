@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # --- CONFIGURATION ---
-NUM_BROWSERS = 8 # Run 8 browsers simultaneously
+NUM_BROWSERS = 12 # Run 12 browsers simultaneously
 URL = "https://std.eng.cu.edu.eg/ClassList.aspx?s=1"
 # ---------------------
 
