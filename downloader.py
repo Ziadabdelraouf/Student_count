@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # --- CONFIGURATION ---
-NUM_BROWSERS = 12 # Run 12 browsers simultaneously
+NUM_BROWSERS = 20 # Run 20 browsers simultaneously
 URL = "https://std.eng.cu.edu.eg/ClassList.aspx?s=1"
 # ---------------------
 
@@ -122,6 +122,9 @@ def process_chunk(chunk_indices, worker_id, permanent_dir):
 
                 code = cols[0].text.strip()
                 session_type = cols[1].text.strip()
+                day = cols[2].text.strip()
+                start_time = cols[3].text.strip()
+                end_time = cols[4].text.strip()
                 
                 link = row.find_element(By.TAG_NAME, "a")
                 print(f"⬇️ [Worker {worker_id}] Clicking: {code}")
@@ -129,7 +132,7 @@ def process_chunk(chunk_indices, worker_id, permanent_dir):
                 
                 # 3. Wait & Rename
                 if wait_for_downloads(worker_temp_dir, timeout=45):
-                    final_path = rename_latest_file(worker_temp_dir, code, session_type)
+                    final_path = rename_latest_file(worker_temp_dir, code, session_type, day, start_time, end_time)
                     if final_path:
                         shutil.move(final_path, os.path.join(permanent_dir, os.path.basename(final_path)))
                         files_downloaded += 1
