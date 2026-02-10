@@ -15,6 +15,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # --- CONFIGURATION ---
 NUM_BROWSERS = 20 # Run 20 browsers simultaneously
+NUM_BROWSERS = 20 # Run 20 browsers simultaneously
 URL = "https://std.eng.cu.edu.eg/ClassList.aspx?s=1"
 # ---------------------
 
@@ -61,7 +62,7 @@ def wait_for_downloads(folder_path, timeout=60):
             return True
     return False
 
-def rename_latest_file(folder_path, code, session_type):
+def rename_latest_file(folder_path, code, name,session_type, day, start_time, end_time):
     """Renames the file in the specific worker's folder with sanitization"""
     try:
         files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if not f.endswith('.crdownload')]
@@ -72,10 +73,14 @@ def rename_latest_file(folder_path, code, session_type):
         if not ext: ext = ".xlsx"
 
         # --- FIX: Sanitize filenames to remove illegal Windows chars ---
-        safe_code = re.sub(r'[<>:"/\\|?*]', '_', code).strip()
-        safe_session = re.sub(r'[<>:"/\\|?*]', '_', session_type).strip()
+        safe_code = re.sub(r'[<>:"/\\|?*]', '-', code).strip()
+        safe_name = re.sub(r'[<>:"/\\|?*]', '-', name).strip()
+        safe_session = re.sub(r'[<>:"/\\|?*]', '-', session_type).strip()
+        safe_day = re.sub(r'[<>:"/\\|?*]', '-', day).strip()
+        safe_start_time = re.sub(r'[<>:"/\\|?*]', '-', start_time).strip()
+        safe_end_time = re.sub(r'[<>:"/\\|?*]', '-', end_time).strip()
 
-        new_name = f"{safe_code}_{safe_session}-{str(uuid.uuid4())[:8]}{ext}"
+        new_name = f"{safe_code}_{safe_name}_{safe_session}_{safe_day}_{safe_start_time}-{safe_end_time}_{str(uuid.uuid4())[:8]}{ext}"
         new_path = os.path.join(folder_path, new_name)
         
         if os.path.exists(new_path): os.remove(new_path)
@@ -121,18 +126,19 @@ def process_chunk(chunk_indices, worker_id, permanent_dir):
                 if not cols: continue
 
                 code = cols[0].text.strip()
-                session_type = cols[1].text.strip()
-                day = cols[2].text.strip()
-                start_time = cols[3].text.strip()
-                end_time = cols[4].text.strip()
-                
+                name=cols[1].text.strip()
+                session_type = cols[3].text.strip()
+                day = cols[4].text.strip()
+                start_time = cols[5].text
+                end_time = cols[6].text
+
                 link = row.find_element(By.TAG_NAME, "a")
                 print(f"⬇️ [Worker {worker_id}] Clicking: {code}")
                 driver.execute_script("arguments[0].click();", link)
                 
                 # 3. Wait & Rename
                 if wait_for_downloads(worker_temp_dir, timeout=45):
-                    final_path = rename_latest_file(worker_temp_dir, code, session_type, day, start_time, end_time)
+                    final_path = rename_latest_file(worker_temp_dir, code, name,session_type, day, start_time, end_time)
                     if final_path:
                         shutil.move(final_path, os.path.join(permanent_dir, os.path.basename(final_path)))
                         files_downloaded += 1
