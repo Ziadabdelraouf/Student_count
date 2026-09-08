@@ -3,7 +3,7 @@ import time
 import shutil
 import uuid
 import math
-import re  # Added for regex sanitization
+import re
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from selenium import webdriver
@@ -14,24 +14,31 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # --- CONFIGURATION ---
-NUM_BROWSERS = 20 # Run 20 browsers simultaneously
-NUM_BROWSERS = 20 # Run 20 browsers simultaneously
+# Use 4 workers in CI/GitHub Actions to prevent out-of-memory errors; 
+# local runs can override this via an env var or use 4 by default.
+NUM_BROWSERS = 4 if os.getenv("CI") else int(os.getenv("NUM_BROWSERS", "6"))
 URL = "https://std.eng.cu.edu.eg/ClassList.aspx?s=1"
+DOWNLOAD_DIR = "downloaded_files"
 # ---------------------
 
 def setup_driver(unique_temp_dir):
-    """Configures a fast, image-free Brave instance"""
+    """Configures a headless Chrome/Brave instance compatible with Linux and Windows."""
     chrome_options = Options()
-    # ⚠️ CHECK THIS PATH
-    chrome_options.binary_location = r"C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe"
 
-    # Run Headless (Invisible) for speed
+    # Only point to Brave if running locally on Windows and the path exists
+    local_brave_path = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
+    if os.name == 'nt' and os.path.exists(local_brave_path) and not os.getenv("CI"):
+        chrome_options.binary_location = local_brave_path
+
+    # Headless mode for server/CI environments
     chrome_options.add_argument("--headless=new") 
     
-    # Speed Optimizations
-    chrome_options.add_argument("--disable-gpu")
+    # Stability and speed flags for Linux / container runners
     chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--window-size=1920,1080")
     chrome_options.add_argument("--blink-settings=imagesEnabled=false") 
     
     prefs = {
@@ -48,12 +55,12 @@ def setup_driver(unique_temp_dir):
     return driver
 
 def wait_for_downloads(folder_path, timeout=60):
-    """Waits until .crdownload files are gone"""
+    """Waits until .crdownload files are gone."""
     end_time = time.time() + timeout
     while time.time() < end_time:
         try:
             files = os.listdir(folder_path)
-        except:
+        except Exception:
             return False
         
         if not files or any(f.endswith('.crdownload') or f.endswith('.tmp') for f in files):
@@ -62,17 +69,19 @@ def wait_for_downloads(folder_path, timeout=60):
             return True
     return False
 
-def rename_latest_file(folder_path, code, name,session_type, day, start_time, end_time):
-    """Renames the file in the specific worker's folder with sanitization"""
+def rename_latest_file(folder_path, code, name, session_type, day, start_time, end_time):
+    """Renames the file in the specific worker's folder with sanitization."""
     try:
         files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if not f.endswith('.crdownload')]
-        if not files: return None
+        if not files:
+            return None
             
         latest_file = max(files, key=os.path.getctime)
         _, ext = os.path.splitext(latest_file)
-        if not ext: ext = ".xlsx"
+        if not ext:
+            ext = ".xlsx"
 
-        # --- FIX: Sanitize filenames to remove illegal Windows chars ---
+        # Sanitize filenames to remove illegal filesystem characters
         safe_code = re.sub(r'[<>:"/\\|?*]', '-', code).strip()
         safe_name = re.sub(r'[<>:"/\\|?*]', '-', name).strip()
         safe_session = re.sub(r'[<>:"/\\|?*]', '-', session_type).strip()
@@ -83,7 +92,8 @@ def rename_latest_file(folder_path, code, name,session_type, day, start_time, en
         new_name = f"{safe_code}_{safe_name}_{safe_session}_{safe_day}_{safe_start_time}-{safe_end_time}_{str(uuid.uuid4())[:8]}{ext}"
         new_path = os.path.join(folder_path, new_name)
         
-        if os.path.exists(new_path): os.remove(new_path)
+        if os.path.exists(new_path):
+            os.remove(new_path)
         os.rename(latest_file, new_path)
         return new_path
     except Exception as e:
@@ -93,8 +103,9 @@ def rename_latest_file(folder_path, code, name,session_type, day, start_time, en
 def process_chunk(chunk_indices, worker_id, permanent_dir):
     """Controls ONE browser handling a specific list of files."""
     worker_temp_dir = os.path.abspath(f"temp_worker_{worker_id}")
-    if os.path.exists(worker_temp_dir): shutil.rmtree(worker_temp_dir)
-    os.makedirs(worker_temp_dir)
+    if os.path.exists(worker_temp_dir):
+        shutil.rmtree(worker_temp_dir)
+    os.makedirs(worker_temp_dir, exist_ok=True)
     
     driver = None
     files_downloaded = 0
@@ -111,8 +122,10 @@ def process_chunk(chunk_indices, worker_id, permanent_dir):
             try:
                 # 1. Clean temp dir
                 for f in os.listdir(worker_temp_dir):
-                    try: os.remove(os.path.join(worker_temp_dir, f))
-                    except: pass
+                    try:
+                        os.remove(os.path.join(worker_temp_dir, f))
+                    except Exception:
+                        pass
                 
                 # 2. Re-find row
                 current_rows = driver.find_elements(By.CSS_SELECTOR, "table tr")
@@ -123,10 +136,11 @@ def process_chunk(chunk_indices, worker_id, permanent_dir):
 
                 row = current_rows[target_idx]
                 cols = row.find_elements(By.TAG_NAME, "td")
-                if not cols: continue
+                if not cols:
+                    continue
 
                 code = cols[0].text.strip()
-                name=cols[1].text.strip()
+                name = cols[1].text.strip()
                 session_type = cols[3].text.strip()
                 day = cols[4].text.strip()
                 start_time = cols[5].text
@@ -138,7 +152,7 @@ def process_chunk(chunk_indices, worker_id, permanent_dir):
                 
                 # 3. Wait & Rename
                 if wait_for_downloads(worker_temp_dir, timeout=45):
-                    final_path = rename_latest_file(worker_temp_dir, code, name,session_type, day, start_time, end_time)
+                    final_path = rename_latest_file(worker_temp_dir, code, name, session_type, day, start_time, end_time)
                     if final_path:
                         shutil.move(final_path, os.path.join(permanent_dir, os.path.basename(final_path)))
                         files_downloaded += 1
@@ -153,13 +167,16 @@ def process_chunk(chunk_indices, worker_id, permanent_dir):
                 try:
                     driver.get(URL)
                     time.sleep(2)
-                except: pass
+                except Exception:
+                    pass
 
     except Exception as e:
         print(f"🔥 [Worker {worker_id}] Crash: {e}")
     finally:
-        if driver: driver.quit()
-        if os.path.exists(worker_temp_dir): shutil.rmtree(worker_temp_dir)
+        if driver:
+            driver.quit()
+        if os.path.exists(worker_temp_dir):
+            shutil.rmtree(worker_temp_dir)
     
     return files_downloaded
 
@@ -167,7 +184,7 @@ def main():
     start_time = datetime.now()
     print(f"🚀 Starting Optimized Parallel Downloader at {start_time.isoformat()}")
     
-    permanent_dir = os.path.abspath("downloaded_files_parallel")
+    permanent_dir = os.path.abspath(DOWNLOAD_DIR)
     os.makedirs(permanent_dir, exist_ok=True)
 
     # --- Phase 1: Scan --- 
@@ -178,7 +195,8 @@ def main():
         WebDriverWait(temp_driver, 20).until(EC.presence_of_element_located((By.TAG_NAME, "table")))
         rows = temp_driver.find_elements(By.TAG_NAME, "tr")
         data_rows = rows[3:] 
-        if data_rows: data_rows.pop() 
+        if data_rows:
+            data_rows.pop() 
         
         total_rows = len(data_rows)
         all_indices = list(range(total_rows))
@@ -188,7 +206,8 @@ def main():
         return
     finally:
         temp_driver.quit()
-        if os.path.exists("temp_scan"): shutil.rmtree("temp_scan")
+        if os.path.exists("temp_scan"):
+            shutil.rmtree("temp_scan")
 
     # --- Phase 2: Split ---
     chunk_size = math.ceil(len(all_indices) / NUM_BROWSERS)
@@ -199,7 +218,7 @@ def main():
     with ThreadPoolExecutor(max_workers=NUM_BROWSERS) as executor:
         futures = []
         for i, chunk in enumerate(chunks):
-            futures.append(executor.submit(process_chunk, chunk, i+1, permanent_dir))
+            futures.append(executor.submit(process_chunk, chunk, i + 1, permanent_dir))
             
         for future in as_completed(futures):
             total_success += future.result()
